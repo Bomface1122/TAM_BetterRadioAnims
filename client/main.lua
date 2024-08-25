@@ -50,40 +50,60 @@ local function checkType(ped, animType)
         male = "mp_m_freemode_01",
         female = "mp_f_freemode_01"
     }
-    local drawableVariationType = {}
-    local textureVariationType = {}
     local model = GetEntityModel(ped)
     local animConfig = config[animType]
-    local drawableType = GetPedDrawableVariation(ped, animConfig.drawable)
-    local textureType = GetPedTextureVariation(ped, animConfig.drawable)
 
     if lib.table.contains(config.blacklistedPeds, model) then
         TriggerEvent("chat:addMessage", "[Radio Anims] The ped model you're using is blacklisted!")
         return false
     end
 
-    for gender, modelType in pairs(modelTypes) do
-        if model == GetHashKey(modelType) then
-            drawableVariationType = animConfig[gender].variations
-            textureVariationType = animConfig[gender].textures
+    for _, drawableConfig in ipairs(animConfig.drawables) do
+        local drawableType = GetPedDrawableVariation(ped, drawableConfig.drawable)
+        local textureType = GetPedTextureVariation(ped, drawableConfig.drawable)
+
+        for gender, modelType in pairs(modelTypes) do
+            if model == GetHashKey(modelType) then
+                for i, variation in ipairs(drawableConfig[gender].variations) do
+                    if drawableType == variation then
+                        local textures = drawableConfig[gender].textures[i]
+                        if textures and lib.table.contains(textures, textureType) then
+                            return true
+                        end
+                    end
+                end
+            end
         end
     end
 
-    if lib.table.contains(drawableVariationType, drawableType) and lib.table.contains(textureVariationType, textureType) then
-        return true
-    end
+    if animConfig.props and type(animConfig.props) == "table" then
+        for _, propConfig in ipairs(animConfig.props) do
+            local propType = GetPedPropIndex(ped, propConfig.prop)
+            local textureType = GetPedPropTextureIndex(ped, propConfig.prop)
 
+            for gender, modelType in pairs(modelTypes) do
+                if model == GetHashKey(modelType) then
+                    for i, variation in ipairs(propConfig[gender].variations) do
+                        if propType == variation then
+                            local textures = propConfig[gender].textures[i]
+                            if textures and lib.table.contains(textures, textureType) then
+                                return true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
     return false
 end
-
 
 ---comment function to handle radio animation
 ---@param enable boolean
 local function handleRadioAnim(enable)
     local ped = cache.ped
     local veh = cache.vehicle
-    local playerId = PlayerId()
-    local isAiming = IsPlayerFreeAiming(playerId)
+    local isAiming = IsPlayerFreeAiming(cache.playerId)
     local vehClass = GetVehicleClass(veh)
 
     if not DoesEntityExist(ped) or IsEntityDead(ped) or IsPauseMenuActive() then return end
@@ -98,7 +118,7 @@ local function handleRadioAnim(enable)
 
         if not emote then return end
 
-        if isAiming and shoulder then
+        if isAiming then
             emote = config.shoulderAnim.emoteAiming
         elseif chest then
             emote = config.chestAnim.emote
@@ -114,7 +134,7 @@ local function handleRadioAnim(enable)
         return
     end
 
-    handleEmote()
+   handleEmote()
 end
 
 if config.useKeybind then
@@ -156,7 +176,7 @@ if config.debug then
     end, false)
 
     RegisterCommand("gettexture", function(source, args)
-        if tonumber(args[1]) == nil then 
+        if tonumber(args[1]) == nil then
             TriggerEvent("chat:addMessage", "Invalid Usage. Usage: /gettexture <0-11>")
             return
         end
